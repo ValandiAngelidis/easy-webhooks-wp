@@ -1,0 +1,64 @@
+# WordPress
+*.log
+.htaccess
+
+# Operating Systems
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# Node (if you add build tools later)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Composer (if you add dependencies later)
+vendor/
+composer.lock
+
+# Compiled translation files (keep .po and .pot, ignore .mo)
+*.mo
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Build/dist folders (if you add build process later)
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+desktop.ini
+
+# Test files (if you add tests later)
+phpunit.xml
+.phpunit.result.cache
+tests/
+
+# Documentation that's redundant for GitHub
+README-STRUCTURE.md
+FINAL-CHECKLIST.md
+WORDPRESS-ORG-READINESS.md
+I18N-IMPLEMENTATION.md
+

@@ -1,0 +1,26 @@
+<?php
+/**
+ * Uninstall Script
+ * Runs when the plugin is deleted to clean up options and data
+ */
+
+// Exit if not called from WordPress
+if (!defined('WP_UNINSTALL_PLUGIN')) {
+    exit;
+}
+
+// Remove plugin options
+delete_option('ew_wp_settings');
+delete_option('ew_wp_logs');
+
+// Clean up on multisite
+if (is_multisite()) {
+    global $wpdb;
+    $blog_ids = $wpdb->get_col("SELECT blog_id FROM $wpdb->blogs");
+    foreach ($blog_ids as $blog_id) {
+        switch_to_blog($blog_id);
+        delete_option('ew_wp_settings');
+        delete_option('ew_wp_logs');
+        restore_current_blog();
+    }
+}
