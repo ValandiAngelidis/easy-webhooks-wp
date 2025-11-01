@@ -200,3 +200,21 @@ msgstr "Vista Previa de Entradas"
 
 msgid "Send Webhook"
 msgstr "Enviar Webhook"
+
+msgid "Invalid user ID."
+msgstr "ID de usuario inválido."
+
+msgid "Please select a user."
+msgstr "Por favor, selecciona un usuario."
+
+msgid "Post Status"
+msgstr "Estado de la Entrada"
+
+msgid "Select the post status to filter posts. Default is \"Published\"."
+msgstr "Selecciona el estado de la entrada para filtrar entradas. Por defecto es \"Publicado\"."
+
+msgid "Select All / Deselect All"
+msgstr "Seleccionar Todo / Deseleccionar Todo"
+
+msgid "Please select a user and at least one post."
+msgstr "Por favor, selecciona un usuario y al menos una entrada."

@@ -35,24 +35,26 @@ class EW_WP_User_Webhook_Settings {
             function updatePostTypes() {
                 var userId = $("#webhook_user_select").val();
                 var $cptSection = $("#cpt-checkboxes");
+                var $postStatusRow = $("#post-status-row");
                 var $sendButton = $("#send-webhook-btn");
                 var $previewSection = $("#posts-preview");
                 
                 if (!userId) {
                     $cptSection.hide();
-                    $sendButton.prop("disabled", true);
+                    $postStatusRow.hide();
                     $previewSection.hide();
-                    return;
+                } else {
+                    $cptSection.show();
+                    updatePreview();
                 }
                 
-                $cptSection.show();
                 checkSendButtonState();
-                updatePreview();
             }
             
             function updatePreview() {
                 var userId = $("#webhook_user_select").val();
                 var selectedCpts = [];
+                var postStatus = $("#post_status_select").val() || "publish";
                 
                 $("#cpt-checkboxes input[type=checkbox]:checked").each(function() {
                     selectedCpts.push($(this).val());
@@ -60,10 +62,12 @@ class EW_WP_User_Webhook_Settings {
                 
                 if (!userId || selectedCpts.length === 0) {
                     $("#posts-preview").hide();
+                    $("#post-status-row").hide();
                     return;
                 }
                 
-                $("#posts-preview").show().html("<p><em>Loading preview...</em></p>");
+                $("#post-status-row").show();
+                $("#posts-preview").show().html("<p><em>' . esc_js(__('Loading preview...', 'easy-webhooks-wp')) . '</em></p>");
                 
                 $.ajax({
                     url: ajaxurl,
@@ -72,6 +76,7 @@ class EW_WP_User_Webhook_Settings {
                         action: "preview_user_posts",
                         user_id: userId,
                         post_types: selectedCpts,
+                        post_status: postStatus,
                         nonce: "' . wp_create_nonce('preview_user_posts') . '"
                     },
                     success: function(response) {
@@ -79,20 +84,25 @@ class EW_WP_User_Webhook_Settings {
                             previewData = response.data;
                             displayPreview(response.data);
                         } else {
-                            $("#posts-preview").html("<p><em>Error loading preview.</em></p>");
+                            $("#posts-preview").html("<p><em>' . esc_js(__('Error loading preview.', 'easy-webhooks-wp')) . '</em></p>");
                         }
                     },
                     error: function() {
-                        $("#posts-preview").html("<p><em>Error loading preview.</em></p>");
+                        $("#posts-preview").html("<p><em>' . esc_js(__('Error loading preview.', 'easy-webhooks-wp')) . '</em></p>");
                     }
                 });
             }
             
             function displayPreview(data) {
-                var html = "<h4>Preview of posts to be included:</h4>";
+                var html = "<h4>' . esc_js(__('Preview of posts to be included:', 'easy-webhooks-wp')) . '</h4>";
                 var totalPosts = 0;
                 
                 if (data.posts && Object.keys(data.posts).length > 0) {
+                    // Add select all/deselect all checkbox
+                    html += "<div style=\"margin-bottom: 10px;\">";
+                    html += "<label><input type=\"checkbox\" id=\"select-all-posts\" checked> <strong>' . esc_js(__('Select All / Deselect All', 'easy-webhooks-wp')) . '</strong></label>";
+                    html += "</div>";
+                    
                     html += "<div style=\"background: #f9f9f9; padding: 10px; border: 1px solid #ddd; max-height: 300px; overflow-y: auto;\">";
                     
                     for (var postType in data.posts) {
@@ -100,31 +110,49 @@ class EW_WP_User_Webhook_Settings {
                         totalPosts += posts.length;
                         
                         html += "<h5>" + postType + " (" + posts.length + " posts):</h5>";
-                        html += "<ul style=\"margin-left: 20px;\">";
+                        html += "<ul style=\"list-style: none; margin-left: 0; padding-left: 0;\">";
                         
                         for (var i = 0; i < posts.length; i++) {
-                            html += "<li>" + posts[i] + "</li>";
+                            html += "<li style=\"margin-bottom: 5px;\">";
+                            html += "<label><input type=\"checkbox\" class=\"post-checkbox\" data-post-id=\"" + posts[i].id + "\" checked> ";
+                            html += posts[i].title + "</label>";
+                            html += "</li>";
                         }
                         
                         html += "</ul>";
                     }
                     
                     html += "</div>";
-                    html += "<p><strong>Total posts: " + totalPosts + "</strong></p>";
+                    html += "<p><strong>' . esc_js(__('Total posts:', 'easy-webhooks-wp')) . ' " + totalPosts + "</strong></p>";
                 } else {
-                    html += "<p><em>No posts found for the selected user and post types.</em></p>";
+                    html += "<p><em>' . esc_js(__('No posts found for the selected user and post types.', 'easy-webhooks-wp')) . '</em></p>";
                 }
                 
                 $("#posts-preview").html(html);
+                
+                // Attach select all handler
+                $("#select-all-posts").on("change", function() {
+                    $(".post-checkbox").prop("checked", $(this).is(":checked"));
+                    checkSendButtonState();
+                });
+                
+                // Update select all state when individual checkboxes change
+                $(document).on("change", ".post-checkbox", function() {
+                    var totalCheckboxes = $(".post-checkbox").length;
+                    var checkedCheckboxes = $(".post-checkbox:checked").length;
+                    $("#select-all-posts").prop("checked", totalCheckboxes === checkedCheckboxes);
+                    checkSendButtonState();
+                });
             }
             
             function checkSendButtonState() {
                 var userId = $("#webhook_user_select").val();
-                var hasChecked = $("#cpt-checkboxes input[type=checkbox]:checked").length > 0;
                 var webhookUrl = $("#webhook_url_input").val().trim();
                 var $sendButton = $("#send-webhook-btn");
                 
-                $sendButton.prop("disabled", !userId || !hasChecked || !webhookUrl || isLoading);
+                // Enable button if user and webhook URL are present
+                // Posts are optional - can send just user data
+                $sendButton.prop("disabled", !userId || !webhookUrl || isLoading);
             }
             
             function showMessage(message, type) {
@@ -134,8 +162,14 @@ class EW_WP_User_Webhook_Settings {
             }
             
             $("#webhook_user_select").on("change", updatePostTypes);
+            
             $(document).on("change", "#cpt-checkboxes input[type=checkbox]", function() {
                 checkSendButtonState();
+                updatePreview();
+            });
+            
+            // Handle post status change
+            $("#post_status_select").on("change", function() {
                 updatePreview();
             });
             
@@ -149,11 +183,11 @@ class EW_WP_User_Webhook_Settings {
                 var webhookUrl = $("#webhook_url_input").val().trim();
                 
                 if (!webhookUrl) {
-                    showMessage("Please enter a webhook URL.", "error");
+                    showMessage("' . esc_js(__('Please enter a webhook URL.', 'easy-webhooks-wp')) . '", "error");
                     return;
                 }
                 
-                $(this).prop("disabled", true).text("Saving...");
+                $(this).prop("disabled", true).text("' . esc_js(__('Saving...', 'easy-webhooks-wp')) . '");
                 
                 $.ajax({
                     url: ajaxurl,
@@ -167,14 +201,14 @@ class EW_WP_User_Webhook_Settings {
                         if (response.success) {
                             showMessage(response.data.message, "success");
                         } else {
-                            showMessage(response.data.message || "Failed to save webhook URL.", "error");
+                            showMessage(response.data.message || "' . esc_js(__('Failed to save webhook URL.', 'easy-webhooks-wp')) . '", "error");
                         }
                     },
                     error: function() {
-                        showMessage("Network error occurred while saving.", "error");
+                        showMessage("' . esc_js(__('Network error occurred while saving.', 'easy-webhooks-wp')) . '", "error");
                     },
                     complete: function() {
-                        $("#save-webhook-url-btn").prop("disabled", false).text("Save URL");
+                        $("#save-webhook-url-btn").prop("disabled", false).text("' . esc_js(__('Save URL', 'easy-webhooks-wp')) . '");
                     }
                 });
             });
@@ -185,25 +219,25 @@ class EW_WP_User_Webhook_Settings {
                 if (isLoading) return;
                 
                 var userId = $("#webhook_user_select").val();
-                var selectedCpts = [];
                 var webhookUrl = $("#webhook_url_input").val().trim();
+                var selectedPostIds = [];
                 
-                $("#cpt-checkboxes input[type=checkbox]:checked").each(function() {
-                    selectedCpts.push($(this).val());
+                $(".post-checkbox:checked").each(function() {
+                    selectedPostIds.push(parseInt($(this).data("post-id")));
                 });
                 
-                if (!userId || selectedCpts.length === 0) {
-                    showMessage("Please select a user and at least one post type.", "error");
+                if (!userId) {
+                    showMessage("' . esc_js(__('Please select a user.', 'easy-webhooks-wp')) . '", "error");
                     return;
                 }
                 
                 if (!webhookUrl) {
-                    showMessage("Please enter a webhook URL.", "error");
+                    showMessage("' . esc_js(__('Please enter a webhook URL.', 'easy-webhooks-wp')) . '", "error");
                     return;
                 }
                 
                 isLoading = true;
-                $(this).prop("disabled", true).text("Sending...");
+                $(this).prop("disabled", true).text("' . esc_js(__('Sending...', 'easy-webhooks-wp')) . '");
                 
                 $.ajax({
                     url: ajaxurl,
@@ -211,7 +245,7 @@ class EW_WP_User_Webhook_Settings {
                     data: {
                         action: "send_user_webhook",
                         user_id: userId,
-                        post_types: selectedCpts,
+                        post_ids: selectedPostIds,
                         webhook_url: webhookUrl,
                         nonce: "' . wp_create_nonce('send_user_webhook') . '"
                     },
@@ -219,15 +253,15 @@ class EW_WP_User_Webhook_Settings {
                         if (response.success) {
                             showMessage(response.data.message, "success");
                         } else {
-                            showMessage(response.data.message || "An error occurred.", "error");
+                            showMessage(response.data.message || "' . esc_js(__('An error occurred.', 'easy-webhooks-wp')) . '", "error");
                         }
                     },
                     error: function() {
-                        showMessage("Network error occurred.", "error");
+                        showMessage("' . esc_js(__('Network error occurred.', 'easy-webhooks-wp')) . '", "error");
                     },
                     complete: function() {
                         isLoading = false;
-                        $("#send-webhook-btn").prop("disabled", false).text("Send Webhook");
+                        $("#send-webhook-btn").prop("disabled", false).text("' . esc_js(__('Send Webhook', 'easy-webhooks-wp')) . '");
                         checkSendButtonState();
                     }
                 });
@@ -268,19 +302,19 @@ class EW_WP_User_Webhook_Settings {
         }
         
         $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
-        $post_types = isset($_POST['post_types']) && is_array($_POST['post_types']) ? array_map('sanitize_text_field', $_POST['post_types']) : [];
+        $post_ids = isset($_POST['post_ids']) && is_array($_POST['post_ids']) ? array_map('intval', $_POST['post_ids']) : [];
         $webhook_url = isset($_POST['webhook_url']) ? esc_url_raw(trim($_POST['webhook_url'])) : '';
         
-        if (!$user_id || empty($post_types)) {
-            wp_send_json_error(['message' => __('Invalid user or post types.', 'easy-webhooks-wp')]);
+        if (!$user_id) {
+            wp_send_json_error(['message' => __('Invalid user ID.', 'easy-webhooks-wp')]);
         }
         
         if (!$webhook_url || !filter_var($webhook_url, FILTER_VALIDATE_URL)) {
             wp_send_json_error(['message' => __('Invalid webhook URL.', 'easy-webhooks-wp')]);
         }
         
-        // Generate webhook data
-        $webhook_data = $this->generate_webhook_data($user_id, $post_types);
+        // Generate webhook data (posts are optional)
+        $webhook_data = $this->generate_webhook_data($user_id, $post_ids);
         
         if (!$webhook_data) {
             wp_send_json_error(['message' => __('Unable to generate webhook data.', 'easy-webhooks-wp')]);
@@ -312,13 +346,14 @@ class EW_WP_User_Webhook_Settings {
         
         $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
         $post_types = isset($_POST['post_types']) && is_array($_POST['post_types']) ? array_map('sanitize_text_field', $_POST['post_types']) : [];
+        $post_status = isset($_POST['post_status']) ? sanitize_text_field($_POST['post_status']) : 'publish';
         
         if (!$user_id || empty($post_types)) {
             wp_send_json_error(['message' => __('Invalid user or post types.', 'easy-webhooks-wp')]);
         }
         
         // Generate preview data
-        $preview_data = $this->generate_preview_data($user_id, $post_types);
+        $preview_data = $this->generate_preview_data($user_id, $post_types, $post_status);
         
         wp_send_json_success($preview_data);
     }
@@ -358,7 +393,7 @@ class EW_WP_User_Webhook_Settings {
     /**
      * Generate preview data for selected user and post types
      */
-    private function generate_preview_data($user_id, $post_types) {
+    private function generate_preview_data($user_id, $post_types, $post_status = 'publish') {
         $user = get_user_by('ID', $user_id);
         if (!$user) {
             return ['posts' => []];
@@ -371,19 +406,22 @@ class EW_WP_User_Webhook_Settings {
             $posts = get_posts([
                 'author' => $user->ID,
                 'post_type' => $post_type,
-                'post_status' => 'publish',
+                'post_status' => $post_status,
                 'numberposts' => -1,
                 'orderby' => 'date',
                 'order' => 'DESC'
             ]);
             
-            $post_titles = [];
+            $post_items = [];
             foreach ($posts as $post) {
-                $post_titles[] = $post->post_title;
+                $post_items[] = [
+                    'id' => $post->ID,
+                    'title' => $post->post_title
+                ];
             }
             
-            if (!empty($post_titles)) {
-                $posts_data[$post_type] = $post_titles;
+            if (!empty($post_items)) {
+                $posts_data[$post_type] = $post_items;
             }
         }
         
@@ -391,9 +429,9 @@ class EW_WP_User_Webhook_Settings {
     }
     
     /**
-     * Generate webhook data for selected user and post types
+     * Generate webhook data for selected user and post IDs
      */
-    private function generate_webhook_data($user_id, $post_types) {
+    private function generate_webhook_data($user_id, $post_ids) {
         $user = get_user_by('ID', $user_id);
         if (!$user) {
             return null;
@@ -405,29 +443,29 @@ class EW_WP_User_Webhook_Settings {
             'display_name' => $user->display_name,
             'user_login' => $user->user_login,
             'email' => $user->user_email,
+            'roles' => $user->roles,
+            'first_name' => get_user_meta($user->ID, 'first_name', true),
+            'last_name' => get_user_meta($user->ID, 'last_name', true),
+            'user_url' => $user->user_url,
+            'description' => $user->description,
             'meta' => get_user_meta($user->ID)
         ];
         
         $webhook_data = ['user' => $user_data];
         
-        // Add posts for selected post types
+        // Add selected posts grouped by post type
         $posts_data = [];
         
-        foreach ($post_types as $post_type) {
-            $posts = get_posts([
-                'author' => $user->ID,
-                'post_type' => $post_type,
-                'post_status' => 'publish',
-                'numberposts' => -1
-            ]);
-            
-            $post_titles = [];
-            foreach ($posts as $post) {
-                $post_titles[] = $post->post_title;
-            }
-            
-            if (!empty($post_titles)) {
-                $posts_data[$post_type] = $post_titles;
+        foreach ($post_ids as $post_id) {
+            $post = get_post($post_id);
+            if ($post && $post->post_author == $user_id) {
+                $post_type = $post->post_type;
+                
+                if (!isset($posts_data[$post_type])) {
+                    $posts_data[$post_type] = [];
+                }
+                
+                $posts_data[$post_type][] = $post->post_title;
             }
         }
         
@@ -538,6 +576,27 @@ class EW_WP_User_Webhook_Settings {
         
         echo '</div>';
         echo '<p class="description">' . esc_html__('Select post types to include authored posts from the selected user.', 'easy-webhooks-wp') . '</p>';
+        echo '</td>';
+        echo '</tr>';
+        
+        // Post status selection
+        echo '<tr id="post-status-row" style="display: none;">';
+        echo '<th scope="row"><label for="post_status_select">' . esc_html__('Post Status', 'easy-webhooks-wp') . '</label></th>';
+        echo '<td>';
+        echo '<select id="post_status_select" class="regular-text">';
+        
+        // Get all post statuses including custom ones
+        $post_statuses = get_post_stati(['show_in_admin_all_list' => true], 'objects');
+        
+        foreach ($post_statuses as $status_key => $status_obj) {
+            $selected = $status_key === 'publish' ? ' selected' : '';
+            echo '<option value="' . esc_attr($status_key) . '"' . $selected . '>';
+            echo esc_html($status_obj->label);
+            echo '</option>';
+        }
+        
+        echo '</select>';
+        echo '<p class="description">' . esc_html__('Select the post status to filter posts. Default is "Published".', 'easy-webhooks-wp') . '</p>';
         echo '</td>';
         echo '</tr>';
         

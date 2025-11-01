@@ -289,6 +289,30 @@ msgstr ""
 msgid "Send Webhook"
 msgstr ""
 
+#: includes/admin/class-user-webhook-settings.php:308
+msgid "Invalid user ID."
+msgstr ""
+
+#: includes/admin/class-user-webhook-settings.php:201
+msgid "Please select a user."
+msgstr ""
+
+#: includes/admin/class-user-webhook-settings.php:556
+msgid "Post Status"
+msgstr ""
+
+#: includes/admin/class-user-webhook-settings.php:569
+msgid "Select the post status to filter posts. Default is \"Published\"."
+msgstr ""
+
+#: includes/admin/class-user-webhook-settings.php:85
+msgid "Select All / Deselect All"
+msgstr ""
+
+#: includes/admin/class-user-webhook-settings.php:201
+msgid "Please select a user and at least one post."
+msgstr ""
+
 #: includes/admin/class-logs-page.php:22
 #: includes/admin/class-logs-page.php:23
 msgid "Webhook Logs"
